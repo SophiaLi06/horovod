@@ -11,6 +11,7 @@ import horovod.torch as hvd
 import os
 import math
 from tqdm import tqdm
+import time
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Example',
@@ -55,7 +56,7 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
 parser.add_argument('--seed', type=int, default=42,
                     help='random seed')
 
-
+throughput_log = []
 def train(epoch):
     model.train()
     train_sampler.set_epoch(epoch)
@@ -68,6 +69,7 @@ def train(epoch):
         for batch_idx, (data, target) in enumerate(train_loader):
             adjust_learning_rate(epoch, batch_idx)
 
+            overall_start = time.time()
             if args.cuda:
                 data, target = data.cuda(), target.cuda()
             optimizer.zero_grad()
@@ -84,8 +86,13 @@ def train(epoch):
                 loss.backward()
             # Gradient is applied across all ranks
             optimizer.step()
+            torch.cuda.synchronize()
+            total_time = time.time() - overall_start
+
             t.set_postfix({'loss': train_loss.avg.item(),
-                           'accuracy': 100. * train_accuracy.avg.item()})
+                           'accuracy': 100. * train_accuracy.avg.item(),
+                           'throuput': len(data)/total_time})
+            throughput_log.append(len(data)/total_time)
             t.update(1)
 
     if log_writer:
@@ -293,3 +300,6 @@ if __name__ == '__main__':
         train(epoch)
         validate(epoch)
         save_checkpoint(epoch)
+
+    print(sum(throughput_log)/len(throughput_log), \
+        min(throughput_log), max(throughput_log))
