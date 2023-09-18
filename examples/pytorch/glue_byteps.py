@@ -284,7 +284,11 @@ def train(args, train_dataset, model, tokenizer) -> Tuple[int, float]:
                 inputs["token_type_ids"] = (
                     batch[2] if args.model_type in ["bert", "xlnet", "albert"] else None
                 )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
-            outputs = model(**inputs)
+            if args.model_type == "bert":
+                inputs = {"input_ids": batch[0], "labels": batch[3]}
+                outputs = model(**inputs)
+            else:
+                outputs = model(**inputs)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
 
             ### Kevin - evaluate the training accuracy
@@ -422,7 +426,11 @@ def evaluate(args, model, tokenizer, prefix="") -> Dict:
                     inputs["token_type_ids"] = (
                         batch[2] if args.model_type in ["bert", "xlnet", "albert"] else None
                     )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
-                outputs = model(**inputs)
+                if args.model_type == "bert":
+                    inputs = {"input_ids": batch[0], "labels": batch[3]}
+                    outputs = model(**inputs)
+                else:
+                    outputs = model(**inputs)
                 tmp_eval_loss, logits = outputs[:2]
                 eval_loss += tmp_eval_loss.mean().item()
             nb_eval_steps += 1
